@@ -1,0 +1,80 @@
+name: Release
+on:
+  push:
+    tags:
+      # We match pushes of semantic versioning tags.
+      - v[0-9]+.[0-9]+.[0-9]+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+
+      - # This step extracts the tag and the version into variables for reuse; you can do this in your preferred way.
+        name: Labeller
+        id: labeller
+        run: |
+          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+          echo "VERSION=${GITHUB_REF/refs\/tags\/v/}" >> $GITHUB_OUTPUT
+
+      - # This step is where you build the distributable of your package, named foobar.
+        name: Build
+        run: |
+          # TODO: somehow build and archive your package into dist/lapreprint.zip
+          cp dist/lapreprint.zip dist/lapreprint-${{ steps.labeller.outputs.version }}.zip
+
+      - # Optionally, you can also publish your release to GitHub.
+        name: Release on Github
+        uses: docker://antonyurchenko/git-release:v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRAFT_RELEASE: "false"
+          CHANGELOG_FILE: "CHANGELOG.md"
+          ALLOW_EMPTY_CHANGELOG: "false"
+          ALLOW_TAG_PREFIX: "true"
+          RELEASE_NAME: "LaPreprint ${{ steps.labeller.outputs.version }}"
+        with:
+          args: |
+            dist/lapreprint-${{ steps.labeller.outputs.version }}.zip
+
+      - # This step is executed only on the first submission of your package to CTAN, assuming your first release tag is v1.0.0. Note that it requires a lot more fields than the simple update step below. Please read and follow CTAN documentation to fill out everything correctly.
+        name: Submit to CTAN (first release)
+        if: ${{ steps.labeller.outputs.version == '1.0.0' }}
+        uses: paolobrasolin/ctan-submit-action@v1
+        with:
+          action: upload
+          file_path: dist/lapreprint-${{ steps.labeller.outputs.version }}.zip
+          fields: |
+            update: "false"
+            pkg: lapreprint
+            version: ${{ steps.labeller.outputs.version }}
+            uploader: Mikkel Roald-Arbøl
+            email: ctan.sak2e@simplelogin.com
+            author: Mikkel Roald-Arbøl
+            license: mit
+            ctanPath: /graphics/pgf/contrib/lapreprint
+            topic: diagram
+            home: https://github.com/roaldarbol/lapreprint/
+            bugs: https://github.com/roaldarbol/lapreprint/issues
+            repository: https://github.com/roaldarbol/lapreprint/
+            summary: >
+              LaPreprint: A nicely formatted LaTeX preprint class
+            description: >
+              LaPreprint is a document class for creating nicely formatted preprints with minimal effort
+            note: >
+              
+
+      - # This step is executed on all subsequent submissions of your package to CTAN. In fact, this is simply an update to an existing package.
+        name: Submit to CTAN (update)
+        if: ${{ steps.labeller.outputs.version != '1.0.0' }}
+        uses: paolobrasolin/ctan-submit-action@v1
+        with:
+          action: upload
+          file_path: dist/foobar-${{ steps.labeller.outputs.version }}.zip
+          fields: |
+            update: "true"
+            pkg: lapreprint
+            version: ${{ steps.labeller.outputs.version }}
+            uploader: Mikkel Roald-Arbøl
+            email: ctan.sak2e@simplelogin.com
