@@ -1,5 +1,6 @@
 build/
-.DS_Store
+testing/
+*.DS_Store
 src/
 example.pdf
 main.tex
